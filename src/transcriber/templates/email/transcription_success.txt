@@ -1,0 +1,10 @@
+{% extends 'email/base.txt' %}
+
+{% load i18n %}
+
+{% trans 'File Transcription Result' %}
+{% trans 'Dear User, we have successfully transcribed your audio file.' %}
+{% trans 'File name:' %} {{ file.file_name_original }}.
+{% trans 'Transcription duration:' %} {{ file.transcription_duration }} {% trans 's.' %}
+{% trans 'Transcribed Content' %}
+{{ file.transcription }}

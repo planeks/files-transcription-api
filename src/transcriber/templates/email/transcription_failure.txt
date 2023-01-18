@@ -1,0 +1,7 @@
+{% extends 'email/base.txt' %}
+
+{% load i18n %}
+
+
+{% trans 'File Transcription Failed' %}
+{% trans 'Dear User, unfortunately something went wrong with your transcription but you can always try to transcribe your file again.' %}

@@ -1,0 +1,45 @@
+{% load i18n %}
+
+<style>
+    .file-input {
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        width: 100%;
+        cursor: pointer;
+        opacity: 0;
+    }
+
+    .file-drop-area {
+        width: 100%;
+        position: sticky;
+    }
+</style>
+
+<div class="file-drop-area border p-5 text-center">
+    <h1 class="h3">{% trans 'Choose your file' %}</h1>
+    <span class="bold" id="selected_msg" style="display: none;">{% trans 'You have selected' %}</span>
+    <span class="text-muted text-truncate">{% trans 'or drag and drop file here' %}</span>
+    <input type="{{ widget.type }}" class="file-input" name="{{ widget.name }}"{% if widget.value != None %} value="{{ widget.value|stringformat:'s' }}"{% endif %}{% include "django/forms/widgets/attrs.html" %}>
+</div>
+
+
+<script>
+    $(document).on('change', '.file-input', function () {
+        var textbox = $(this).prev();
+        var fileName = $(this).val().split('\\').pop();
+
+        let selectedMsg = document.getElementById('selected_msg');
+        if (fileName !== '') {
+            if (fileName.length > 30) {
+                fileName = fileName.substring(0, 30) + '...'
+            }
+            textbox.text(fileName);
+            selectedMsg.style.display = 'block';
+        } else {
+            textbox.text('or drag and drop files here');
+            selectedMsg.style.display = 'none';
+        }
+    });
+</script>

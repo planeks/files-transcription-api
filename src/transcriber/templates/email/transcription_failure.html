@@ -1,0 +1,31 @@
+{% extends 'email/base.html' %}
+{% load i18n %}
+
+{% block extra_css %}
+    <style>
+        .title_wrapper {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+        }
+
+        .important_text {
+            font-weight: bolder;
+            color: darkred;
+        }
+
+        #title {
+            align-self: center;
+        }
+    </style>
+{% endblock %}
+
+
+{% block content %}
+    <div class="title_wrapper">
+        <h1 id="title" class="important_text">{% trans 'File Transcription Failed' %}</h1>
+    </div>
+    <p style="margin-bottom: 20px;">
+        {% trans 'Dear User, unfortunately something went wrong with your transcription but you can always try to transcribe your file again.' %}
+    </p>
+{% endblock %}

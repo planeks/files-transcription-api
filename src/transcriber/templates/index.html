@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans 'Files-Transcriber' %}{% endblock %}
+
+{% block extra_css %}
+    <style>
+        * {
+            font-family: 'Fira Sans', serif;
+        }
+
+        #file_form {
+            max-width: 600px;
+            max-height: 600px;
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <form id="file_form" class="card p-4 d-flex flex-column justify-content-around"
+          onsubmit="event.preventDefault(); return submitAudioFile()">
+        <h3 class="text-center">{% trans 'File Transcription' %}</h3>
+        <div class="alert alert-info mb-4 text-center" role="alert">
+            {% trans 'Give us an email address and audio file and we will transcribe it for you! You can find a list of supported languages ' %}
+            <a href="https://docs.aws.amazon.com/transcribe/latest/dg/supported-languages.html"
+               target="_blank">{% trans 'here' %}</a>.
+        </div>
+        {% include "forms/form_fields.html" with hide_required_badges=True %}
+        <button id="audio_submit" type="submit" class="btn btn-info text-white">{% trans 'Transcribe' %}</button>
+        <div id="processing_box" class="d-flex flex-column align-items-center d-none">
+            <span class="text-center">{% trans 'Uploading the file...' %}</span>
+            <div class="progress w-100">
+                <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-info"
+                     style="width: 50%"></div>
+            </div>
+        </div>
+    </form>
+    <div style="position: absolute; bottom: 0; right: 0;">
+        <div id="success_toast" class="toast bg-success text-white" role="alert" aria-live="assertive"
+             aria-atomic="true">
+            <div class="toast-header">
+                <strong class="me-auto">{% trans 'File Upload' %}</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                {% trans 'Your file have been successfully uploaded, your transcription will start soon.' %}
+            </div>
+        </div>
+        <div id="failure_toast" class="toast bg-danger text-white" role="alert" aria-live="assertive"
+             aria-atomic="true">
+            <div class="toast-header">
+                <strong class="me-auto">{% trans 'File Upload' %}</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div id="failure_text" class="toast-body">
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        window.onload = () => {
+            let fileUploaded = localStorage.getItem('file_uploaded');
+            if (fileUploaded) {
+                let toast = new bootstrap.Toast(document.querySelector('#success_toast'));
+                toast.show();
+                localStorage.removeItem('file_uploaded');
+            }
+        }
+
+        function processFileUploadFailure(fileId, failureText) {
+            let textElement = document.querySelector('#failure_text');
+            if (failureText) {
+                textElement.textContent = failureText;
+            } else {
+                textElement.textContent = "{% trans 'File upload failed, please reload the page and try again.' %}";
+            }
+            let toast = new bootstrap.Toast(document.querySelector('#failure_toast'));
+            toast.show();
+
+            if (fileId === undefined) {
+                return
+            }
+
+            $.ajax({
+                url: "{% url "finish_file_upload" %}",
+                method: "POST",
+                headers: {'X-CSRFToken': '{{ csrf_token }}'},
+                data: {'id': fileId, 'status': 'failed'},
+                dataType: "json",
+                success: function () {
+                    switchAnimation(false);
+                }
+            });
+        }
+
+
+        function submitAudioFile() {
+            let fileInput = document.querySelector('#id_file');
+            let fileName = fileInput.files[0].name;
+            let fileType = fileInput.files[0].type;
+            let userEmail = document.querySelector('#id_user_email').value;
+
+            startAudioUploadToS3(fileName, fileType, userEmail);
+        }
+
+        function changeProgress(percent) {
+            document.querySelector('#progress-bar').style.width = percent + '%'
+        }
+
+        function switchAnimation(showAnimation) {
+            if (showAnimation) {
+                document.querySelector('#audio_submit').classList.add('d-none');
+                document.querySelector('#processing_box').classList.remove('d-none');
+            } else {
+                document.querySelector('#audio_submit').classList.remove('d-none');
+                document.querySelector('#processing_box').classList.add('d-none');
+            }
+            changeProgress(0);
+        }
+
+        function startAudioUploadToS3(fileName, fileType, userEmail) {
+            switchAnimation(true);
+            $.ajax({
+                url: "{% url "start_file_upload" %}",
+                method: "POST",
+                headers: {'X-CSRFToken': '{{ csrf_token }}'},
+                data: {'file_name': fileName, 'file_type': fileType, 'user_email': userEmail},
+                dataType: "json",
+                success: function (presigned_data) {
+                    let fileInput = document.querySelector('#id_file');
+                    changeProgress(33);
+                    performUploadToS3(presigned_data, fileInput.files[0]);
+                }
+            }).fail(function (errors) {
+                let failureText;
+                if ('file_type' in errors.responseJSON) {
+                    failureText = errors.responseJSON.file_type[0];
+                }
+                processFileUploadFailure({fileId: undefined, failureText: failureText});
+                switchAnimation(false);
+            });
+        }
+
+        function performUploadToS3(data, file) {
+            const postData = new FormData();
+            for (const key in data.fields) {
+                postData.append(key, data.fields[key]);
+            }
+            postData.append('file', file);
+
+            $.ajax({
+                url: data.url,
+                method: "POST",
+                data: postData,
+                processData: false,
+                contentType: false,
+                success: function () {
+                    changeProgress(66);
+                    finishUploadToS3(data);
+                }
+            }).fail(function (errors) {
+                processFileUploadFailure(data.id);
+                switchAnimation(false);
+            });
+        }
+
+        function finishUploadToS3({id}) {
+            changeProgress(100);
+            switchAnimation(false);
+
+            $.ajax({
+                url: "{% url "finish_file_upload" %}",
+                method: "POST",
+                headers: {'X-CSRFToken': '{{ csrf_token }}'},
+                data: {'id': id, 'status': 'uploaded'},
+                dataType: "json",
+                success: function () {
+                    localStorage.setItem('file_uploaded', true);
+                    startFileTranscription(id);
+                    location.reload();
+                }
+            }).fail(function (errors) {
+                processFileUploadFailure(id);
+            });
+        }
+
+        function startFileTranscription(file_id) {
+            $.ajax({
+                url: "{% url "start_file_transcription" %}",
+                method: "POST",
+                headers: {'X-CSRFToken': '{{ csrf_token }}'},
+                data: {'id': file_id},
+                dataType: "json"
+            }).fail(function (errors) {
+                processFileUploadFailure(file_id);
+            });
+        }
+    </script>
+{% endblock %}

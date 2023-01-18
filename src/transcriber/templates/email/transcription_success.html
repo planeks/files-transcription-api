@@ -1,0 +1,49 @@
+{% extends 'email/base.html' %}
+{% load i18n %}
+
+{% block extra_css %}
+    <style>
+        .title_wrapper {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+        }
+
+        #transcription {
+            text-align: justify;
+        }
+
+        .important_text {
+            font-weight: bolder;
+            color: #04414d;
+        }
+
+        #title {
+            align-self: center;
+        }
+
+        .long_text {
+            word-break: break-all;
+            display: block;
+            width: 600px;
+        }
+    </style>
+{% endblock %}
+
+
+{% block content %}
+    <div class="title_wrapper">
+        <h1 id="title" class="important_text">{% trans 'File Transcription Result' %}</h1>
+    </div>
+    <p style="margin-bottom: 20px;">{% trans 'Dear User, we have successfully transcribed your audio file.' %}</p>
+    <span class="long_text">{% trans 'File name:' %} <span
+            class="important_text">{{ file.file_name_original }}</span>.</span><br>
+    <span>{% trans 'Transcription duration:' %} <span
+            class="important_text">{{ file.transcription_duration }}</span> {% trans 's.' %}</span><br>
+    <br>
+    <hr><br>
+    <div class="title_wrapper">
+        <span class="important_text">{% trans 'Transcribed Content' %}</span><br><br>
+    </div>
+    <p id="transcription">{{ file.transcription }}</p>
+{% endblock %}
